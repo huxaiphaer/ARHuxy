@@ -15,33 +15,41 @@ import com.squareup.picasso.Target;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
-import java.util.Locale;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.IntStream;
 
 public class Utils {
 
+    File[] allImagesList;
+    File[] allVideosList;
+
 
     public static void DownloadImage(Context context, String MyUrl) {
+
         Picasso.get().load(MyUrl).into(new Target() {
             @Override
             public void onBitmapLoaded(Bitmap bitmap, Picasso.LoadedFrom from) {
 
                 try {
-                    String root = context.getExternalFilesDir(null).toString();
-                    File myDir = new File(root, "NewVisionAR");
+                    String root = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES).toString();
+                    File myDir = new File(root, "NewVisionARImages");
 
                     if (!myDir.exists()) {
                         myDir.mkdirs();
                     }
 
-                    String name = new SimpleDateFormat("yyyymmdd_HHmmss", Locale.getDefault()) + ".jpg";
-                    myDir = new File(myDir, name);
+                    myDir = new File(myDir, System.currentTimeMillis() + ".jpg");
 
-                    Toast.makeText(context, "Load ...." + root, Toast.LENGTH_LONG).show();
+                    Toast.makeText(context, "downloading  ...." + root, Toast.LENGTH_LONG).show();
 
-                    System.out.println("--Huxy path " + myDir);
                     FileOutputStream out = new FileOutputStream(myDir);
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
+                    System.out.println("Done downloading ");
+                    Toast.makeText(context, "Done downloading  ...." + root, Toast.LENGTH_LONG).show();
 
                     out.flush();
                     out.close();
@@ -53,11 +61,13 @@ public class Utils {
             public void onBitmapFailed(Exception e, Drawable errorDrawable) {
 
                 Toast.makeText(context, "Something wrong happened", Toast.LENGTH_LONG).show();
+                System.out.println(" bitmap failed ");
             }
 
             @Override
             public void onPrepareLoad(Drawable placeHolderDrawable) {
                 Toast.makeText(context, "Loading ....", Toast.LENGTH_LONG).show();
+                System.out.println("On prepare ");
             }
         });
     }
@@ -76,11 +86,44 @@ public class Utils {
             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
         }
 
-        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "/NewVisionAR/" + "test.mp4");
+        request.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_MOVIES, "/NewVisionVideos/" + strDate + System.currentTimeMillis() + ".mp4");
 
-        System.out.println("video path " + context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) + "/NewVisionAR/" + "strDate" + ".mp4");
         DownloadManager manager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
         manager.enqueue(request);
+
+    }
+
+    public void ListAllFiles(Context context) {
+
+        List<File> imageNames = new ArrayList<>();
+        List<File> videoNames = new ArrayList<>();
+        Map<File, File> map;
+        File[] allImagesList;
+        File[] allVideosList;
+
+
+        //Handling Images
+        String root = context.getExternalFilesDir(null).toString();
+        File allImages = new File(root, "NewVisionARImages");
+        allImagesList = allImages.listFiles();
+
+        File allVideos = context.getExternalFilesDir(Environment.DIRECTORY_MOVIES + "/NewVisionVideos/");
+        allVideosList = allVideos.listFiles();
+
+        for (int i = 0; i < allVideosList.length; i++) {
+            videoNames.add(allVideosList[i]);
+        }
+        for (int i = 0; i < allImagesList.length; i++) {
+            imageNames.add(allImagesList[i]);
+        }
+
+
+        map = IntStream.range(0, imageNames.size())
+                .collect(
+                        HashMap::new,
+                        (m, i) -> m.put(imageNames.get(i), videoNames.get(i)),
+                        Map::putAll
+                );
 
     }
 

@@ -18,7 +18,6 @@ import android.widget.Toast
 import androidx.core.animation.doOnStart
 import androidx.core.graphics.rotationMatrix
 import androidx.core.graphics.transform
-import coil.Coil
 import com.google.ar.core.AugmentedImage
 import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Config
@@ -27,9 +26,12 @@ import com.google.ar.sceneform.FrameTime
 import com.google.ar.sceneform.rendering.ExternalTexture
 import com.google.ar.sceneform.rendering.ModelRenderable
 import com.google.ar.sceneform.ux.ArFragment
-import com.shliama.augmentedvideotutorial.Utils.DownloadVideo
 import java.io.File
 import java.io.IOException
+import java.util.*
+import java.util.stream.IntStream
+import kotlin.collections.HashMap
+import kotlin.collections.set
 
 open class ArVideoFragment : ArFragment() {
 
@@ -38,6 +40,8 @@ open class ArVideoFragment : ArFragment() {
     private lateinit var videoRenderable: ModelRenderable
     private lateinit var videoAnchorNode: VideoAnchorNode
     private lateinit var utils: Utils
+    private lateinit var map: Map<File, File>
+    private lateinit var filteredMap: Map<File, File>
 
     private var activeAugmentedImage: AugmentedImage? = null
 
@@ -45,11 +49,51 @@ open class ArVideoFragment : ArFragment() {
         super.onCreate(savedInstanceState)
         mediaPlayer = MediaPlayer()
 
-//        DownloadImage(context,"https://res.cloudinary.com/do6g6dwlz/image/upload/v1594038092/khxcksgccvojkjpjttpa.jpg")
-        DownloadVideo(
-            context,
-            "https://res.cloudinary.com/do6g6dwlz/video/upload/v1594290013/l4jvaiwfj9qfssn0kfrl.mp4"
-        )
+//        DownloadVideo(
+//            context,
+//            "https://res.cloudinary.com/do6g6dwlz/video/upload/v1594290013/l4jvaiwfj9qfssn0kfrl.mp4"
+//        )
+
+//        DownloadImage(
+//            context,
+//            "https://res.cloudinary.com/do6g6dwlz/image/upload/v1594038092/khxcksgccvojkjpjttpa.jpg"
+//        )
+
+
+    }
+
+    private fun listAllFiles() {
+        val imageNames: MutableList<File> =
+            ArrayList()
+        val videoNames: MutableList<File> =
+            ArrayList()
+
+        val allImagesList: Array<File>
+        val allVideosList: Array<File>
+
+
+        //Handling Images
+        val root = context?.getExternalFilesDir(Environment.DIRECTORY_PICTURES).toString()
+        val allImages = File(root, "NewVisionARImages")
+        allImagesList = allImages.listFiles()
+        val allVideos =
+            context?.getExternalFilesDir(Environment.DIRECTORY_MOVIES + "/NewVisionVideos/")
+        allVideosList = allVideos!!.listFiles()
+        for (i in allVideosList.indices) {
+            videoNames.add(allVideosList[i])
+        }
+        for (i in allImagesList.indices) {
+            imageNames.add(allImagesList[i])
+        }
+        map = IntStream.range(0, imageNames.size)
+            .collect(
+                { HashMap() },
+                { m: java.util.HashMap<File, File>, i: Int ->
+                    m[imageNames[i]] = videoNames[i]
+                }
+            ) { obj: java.util.HashMap<File, File>, map: java.util.HashMap<File, File>? ->
+                obj.putAll(map!!)
+            }
 
     }
 
@@ -65,10 +109,9 @@ open class ArVideoFragment : ArFragment() {
         arSceneView.planeRenderer.isEnabled = false
         arSceneView.isLightEstimationEnabled = false
 
-
+        listAllFiles()
         initializeSession()
         createArScene()
-
 
         return view
     }
@@ -76,28 +119,23 @@ open class ArVideoFragment : ArFragment() {
     override fun getSessionConfiguration(session: Session): Config {
 
 
-        fun loadAugmentedImageBitmap(): Bitmap? {
+        fun loadAugmentedImageBitmap(imageName: String): Bitmap? {
             val file =
-                File("/storage/emulated/0/Android/data/com.shliama.augmentedvideotutorial/files/NewVisionAR/java.text.SimpleDateFormat@a13ba5bf.jpg")
+                File(imageName)
             val filePath: String = file.path
             return BitmapFactory.decodeFile(filePath)
 
         }
-
-        fun loadAugmentedImageBitmap2(imageName: String): Bitmap =
-            requireContext().assets.open(imageName).use { return BitmapFactory.decodeStream(it) }
-
-        val loader = activity?.applicationContext?.let { Coil.imageLoader(it) }
 
 
         fun setupAugmentedImageDatabase(config: Config, session: Session): Boolean {
             try {
                 config.augmentedImageDatabase = AugmentedImageDatabase(session).also { db ->
 
-                    var videoLink =
-                        (requireContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath+ "/NewVisionAR/test.mp4"
-                            ?: "")
-                    db.addImage(videoLink, loadAugmentedImageBitmap2(TEST_IMAGE_3))
+                    for ((i, v) in map) {
+
+                        db.addImage(v.absolutePath, loadAugmentedImageBitmap(i.absolutePath))
+                    }
 
                 }
                 return true
@@ -116,7 +154,7 @@ open class ArVideoFragment : ArFragment() {
             if (!setupAugmentedImageDatabase(it, session)) {
                 Toast.makeText(
                     requireContext(),
-                    "Could not setup augmented image database",
+                    "Something went wrong while setting up.",
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -216,57 +254,53 @@ open class ArVideoFragment : ArFragment() {
     private fun playbackArVideo(augmentedImage: AugmentedImage) {
         Log.d(TAG, "playbackVideo = ${augmentedImage.name}")
 
-        requireContext().assets.openFd(augmentedImage.name)
-            .use { descriptor ->
 
-                val metadataRetriever = MediaMetadataRetriever()
-                metadataRetriever.setDataSource(
-                    descriptor.fileDescriptor,
-                    descriptor.startOffset,
-                    descriptor.length
-                )
+        val metadataRetriever = MediaMetadataRetriever()
+        metadataRetriever.setDataSource(
+            augmentedImage.name
+        )
 
-                val videoWidth =
-                    metadataRetriever.extractMetadata(METADATA_KEY_VIDEO_WIDTH).toFloatOrNull()
-                        ?: 0f
-                val videoHeight =
-                    metadataRetriever.extractMetadata(METADATA_KEY_VIDEO_HEIGHT).toFloatOrNull()
-                        ?: 0f
-                val videoRotation =
-                    metadataRetriever.extractMetadata(METADATA_KEY_VIDEO_ROTATION).toFloatOrNull()
-                        ?: 0f
+        val videoWidth =
+            metadataRetriever.extractMetadata(METADATA_KEY_VIDEO_WIDTH).toFloatOrNull()
+                ?: 0f
+        val videoHeight =
+            metadataRetriever.extractMetadata(METADATA_KEY_VIDEO_HEIGHT).toFloatOrNull()
+                ?: 0f
+        val videoRotation =
+            metadataRetriever.extractMetadata(METADATA_KEY_VIDEO_ROTATION).toFloatOrNull()
+                ?: 0f
 
-                // Account for video rotation, so that scale logic math works properly
-                val imageSize = RectF(0f, 0f, augmentedImage.extentX, augmentedImage.extentZ)
-                    .transform(rotationMatrix(videoRotation))
+        // Account for video rotation, so that scale logic math works properly
+        val imageSize = RectF(0f, 0f, augmentedImage.extentX, augmentedImage.extentZ)
+            .transform(rotationMatrix(videoRotation))
 
-                val videoScaleType = VideoScaleType.CenterCrop
+        val videoScaleType = VideoScaleType.CenterCrop
 
-                videoAnchorNode.setVideoProperties(
-                    videoWidth = videoWidth,
-                    videoHeight = videoHeight,
-                    videoRotation = videoRotation,
-                    imageWidth = imageSize.width(),
-                    imageHeight = imageSize.height(),
-                    videoScaleType = videoScaleType
-                )
+        videoAnchorNode.setVideoProperties(
+            videoWidth = videoWidth,
+            videoHeight = videoHeight,
+            videoRotation = videoRotation,
+            imageWidth = imageSize.width(),
+            imageHeight = imageSize.height(),
+            videoScaleType = videoScaleType
+        )
 
-                // Update the material parameters
-                videoRenderable.material.setFloat2(
-                    MATERIAL_IMAGE_SIZE,
-                    imageSize.width(),
-                    imageSize.height()
-                )
-                videoRenderable.material.setFloat2(MATERIAL_VIDEO_SIZE, videoWidth, videoHeight)
-                videoRenderable.material.setBoolean(MATERIAL_VIDEO_CROP, VIDEO_CROP_ENABLED)
+        // Update the material parameters
+        videoRenderable.material.setFloat2(
+            MATERIAL_IMAGE_SIZE,
+            imageSize.width(),
+            imageSize.height()
+        )
+        videoRenderable.material.setFloat2(MATERIAL_VIDEO_SIZE, videoWidth, videoHeight)
+        videoRenderable.material.setBoolean(MATERIAL_VIDEO_CROP, VIDEO_CROP_ENABLED)
 
-                mediaPlayer.reset()
-                mediaPlayer.setDataSource(descriptor)
-            }.also {
-                mediaPlayer.isLooping = true
-                mediaPlayer.prepare()
-                mediaPlayer.start()
-            }
+        mediaPlayer.reset()
+        mediaPlayer.setDataSource(augmentedImage.name)
+
+        mediaPlayer.isLooping = true
+        mediaPlayer.prepare()
+        mediaPlayer.start()
+
 
 
         videoAnchorNode.anchor?.detach()
@@ -304,14 +338,6 @@ open class ArVideoFragment : ArFragment() {
 
     companion object {
         private const val TAG = "ArVideoFragment"
-
-        private const val TEST_IMAGE_1 = "test_image_1.jpg"
-        private const val TEST_IMAGE_2 = "test_image_2.jpg"
-        private const val TEST_IMAGE_3 = "test_image_3.jpg"
-
-        private const val TEST_VIDEO_1 = "test_video_1.mp4"
-        private const val TEST_VIDEO_2 = "test_video_2.mp4"
-        private const val TEST_VIDEO_3 = "test_video_3.mp4"
 
         private const val VIDEO_CROP_ENABLED = true
 
