@@ -14,6 +14,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.core.animation.doOnStart
 import androidx.core.graphics.rotationMatrix
@@ -32,6 +35,7 @@ import java.util.*
 import java.util.stream.IntStream
 import kotlin.collections.HashMap
 import kotlin.collections.set
+import com.shliama.augmentedvideotutorial.Utils as Utils1
 
 open class ArVideoFragment : ArFragment() {
 
@@ -39,26 +43,17 @@ open class ArVideoFragment : ArFragment() {
     private lateinit var externalTexture: ExternalTexture
     private lateinit var videoRenderable: ModelRenderable
     private lateinit var videoAnchorNode: VideoAnchorNode
-    private lateinit var utils: Utils
+    private lateinit var utils: Utils1
     private lateinit var map: Map<File, File>
-    private lateinit var filteredMap: Map<File, File>
+    private var progressBar: ProgressBar? = null
+    private var loader: LinearLayout? = null
+    private var cameraView: FrameLayout? = null
 
     private var activeAugmentedImage: AugmentedImage? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         mediaPlayer = MediaPlayer()
-
-//        DownloadVideo(
-//            context,
-//            "https://res.cloudinary.com/do6g6dwlz/video/upload/v1594290013/l4jvaiwfj9qfssn0kfrl.mp4"
-//        )
-
-//        DownloadImage(
-//            context,
-//            "https://res.cloudinary.com/do6g6dwlz/image/upload/v1594038092/khxcksgccvojkjpjttpa.jpg"
-//        )
-
 
     }
 
@@ -71,29 +66,32 @@ open class ArVideoFragment : ArFragment() {
         val allImagesList: Array<File>
         val allVideosList: Array<File>
 
-
-        //Handling Images
-        val root = context?.getExternalFilesDir(Environment.DIRECTORY_PICTURES).toString()
-        val allImages = File(root, "NewVisionARImages")
-        allImagesList = allImages.listFiles()
-        val allVideos =
-            context?.getExternalFilesDir(Environment.DIRECTORY_MOVIES + "/NewVisionVideos/")
-        allVideosList = allVideos!!.listFiles()
-        for (i in allVideosList.indices) {
-            videoNames.add(allVideosList[i])
-        }
-        for (i in allImagesList.indices) {
-            imageNames.add(allImagesList[i])
-        }
-        map = IntStream.range(0, imageNames.size)
-            .collect(
-                { HashMap() },
-                { m: java.util.HashMap<File, File>, i: Int ->
-                    m[imageNames[i]] = videoNames[i]
-                }
-            ) { obj: java.util.HashMap<File, File>, map: java.util.HashMap<File, File>? ->
-                obj.putAll(map!!)
+        try {
+            //Handling Images
+            val root = context?.getExternalFilesDir(Environment.DIRECTORY_PICTURES).toString()
+            val allImages = File(root, "NewVisionARImages")
+            allImagesList = allImages.listFiles()
+            val allVideos =
+                context?.getExternalFilesDir(Environment.DIRECTORY_MOVIES + "/NewVisionVideos/")
+            allVideosList = allVideos!!.listFiles()
+            for (i in allVideosList.indices) {
+                videoNames.add(allVideosList[i])
             }
+            for (i in allImagesList.indices) {
+                imageNames.add(allImagesList[i])
+            }
+            map = IntStream.range(0, imageNames.size)
+                .collect(
+                    { HashMap() },
+                    { m: java.util.HashMap<File, File>, i: Int ->
+                        m[imageNames[i]] = videoNames[i]
+                    }
+                ) { obj: java.util.HashMap<File, File>, map: java.util.HashMap<File, File>? ->
+                    obj.putAll(map!!)
+                }
+        } catch (e: java.lang.Exception) {
+            println("error")
+        }
 
     }
 
